@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pendaftaran Iris</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+    <style>
+        .back-link {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+        }
+        .scanner-container {
+            position: relative;
+            max-width: 640px;
+            margin: 0 auto 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        #videoElement {
+            width: 100%;
+            background-color: #000;
+        }
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+        .scan-circle {
+            width: 220px;
+            height: 220px;
+            border: 3px solid rgba(255, 255, 255, 0.7);
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+        }
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: rgba(0, 230, 120, 0.8);
+            animation: scan 2s linear infinite;
+        }
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            min-width: 300px;
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="btn btn-sm btn-outline-primary back-link">
+            <i class="bi bi-arrow-left"></i> Kembali
+        </a>
+
+        <div class="text-center mb-4">
+            <h1 class="display-5">Daftarkan Pengguna Baru</h2>
+            <p class="text-muted">Daftarkan iris anda</p>
+        </div>
+
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="scanner-container">
+                    <img id="videoElement" src="/video_feed">
+                    <div class="overlay">
+                        <div class="scan-circle">
+                            <div class="scan-line"></div>
+                        </div>
+                    </div>
+                </div>
+                <form id="registerForm" class="mt-3">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Nama Pengguna</label>
+                        <input type="text" class="form-control" id="username" placeholder="Masukkan nama Anda" required>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">Daftarkan</button>
+                </form>
+                <div class="mt-3" id="registerResult"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast-container">
+        <div id="resultToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto">Hasil Scan</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toastMessage">
+                <!-- Pesan akan diisi secara dinamis -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        $(function() {
+            const toast = new bootstrap.Toast(document.getElementById('resultToast'));
+
+            function showToast(message, isSuccess) {
+                $('#toastMessage').text(message);
+                $('#resultToast').removeClass('bg-success bg-danger');
+                $('#resultToast').addClass(isSuccess ? 'bg-success text-white' : 'bg-danger text-white');
+                toast.show();
+            }
+
+            $('#registerForm').submit(function(e) {
+                e.preventDefault();
+                const username = $('#username').val().trim();
+                if (!username) {
+                    alert('Nama pengguna wajib diisi');
+                    return;
+                }
+                $('#registerResult').text('Memproses pendaftaran...');
+
+                $.post('/do_register', { username: username }, function(response) {
+                    if (response.status === 'success') {
+                        showToast(response.message, true);
+                        $('#registerResult').html('');
+                        $('#username').val('');
+                    } else {
+                        showToast(response.message, false);
+                        $('#registerResult').html('');
+                    }
+                }).fail(function() {
+                    showToast('Terjadi kesalahan pada server', false);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
