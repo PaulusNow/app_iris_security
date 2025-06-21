@@ -16,9 +16,9 @@ import math
 app = Flask(__name__)
 
 # ===== CONFIGURATION =====
-MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
-MYSQL_USER = os.environ.get('MYSQL_USER', 'iris_app')
-MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'password_kuat123!')
+MYSQL_HOST = os.environ.get('MYSQL_HOST', 'iris-security.criyqeisgk0r.ap-southeast-2.rds.amazonaws.com')
+MYSQL_USER = os.environ.get('MYSQL_USER', 'admin')
+MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'aws_iris_eye_no_eye')
 MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
 MYSQL_CHARSET = 'utf8mb4'
 
