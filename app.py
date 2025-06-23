@@ -12,6 +12,7 @@ import threading
 import time
 import atexit
 import math
+import requests
 
 app = Flask(__name__)
 
@@ -22,7 +23,14 @@ MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'aws_iris_eye_no_eye')
 MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
 MYSQL_CHARSET = 'utf8mb4'
 
+# MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
+# MYSQL_USER = os.environ.get('MYSQL_USER', 'iris_app')
+# MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'password_kuat123!')
+# MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
+# MYSQL_CHARSET = 'utf8mb4'
+
 AES_KEY = os.environ.get('AES_KEY', 'my_super_secret_key_32bytes').ljust(32)[:32].encode()
+ESP32_IP = os.environ.get('ESP32_IP', 'http://10.10.10.190')
 IRIS_MATCH_THRESHOLD = 475  # Optimal threshold from the paper
 DEBUG_MODE = os.environ.get('DEBUG_MODE', 'False').lower() == 'true'
 MODEL_PATH = os.path.join('model', 'iris_model_alexnet.h5')
@@ -246,21 +254,25 @@ def video_feed():
 def scan():
     img = webcam.get_frame()
     if img is None:
+        print("[ERROR] Tidak dapat mengambil gambar dari webcam.")
         return jsonify({"status": "error", "message": "Gagal mengambil gambar"})
 
     if predict_eye_noeye(img) != "eye":
+        print("[INFO] Gambar bukan iris yang valid.")
         return jsonify({"status": "noeye", "message": "Iris tidak terdeteksi"})
 
     gray = iris_processor.preprocess_image(img)
     pupil = iris_processor.detect_pupil(gray)
     iris = iris_processor.detect_iris(gray, pupil)
     if pupil is None or iris is None:
+        print("[ERROR] Segmentasi pupil atau iris gagal.")
         return jsonify({"status": "error", "message": "Segmentasi gagal"})
 
     normalized = iris_processor.normalize_iris(img, pupil, iris)
     template_bytes, _ = iris_processor.extract_features(normalized)
 
     if not template_bytes:
+        print("[ERROR] Gagal mengekstrak fitur iris.")
         return jsonify({"status": "error", "message": "Gagal mengekstrak template iris"})
 
     with get_db_connection() as conn:
@@ -277,15 +289,21 @@ def scan():
                     if distance < min_distance:
                         min_distance = distance
                         best_match = row['username']
-                except:
+                except Exception as e:
+                    print(f"[ERROR] Gagal mendekripsi atau menghitung jarak untuk {row['username']}: {e}")
                     continue
 
             if min_distance < 475:
                 log_audit("SCAN_SUCCESS", username=best_match, status=f"distance={min_distance}")
+                
+                # Kirim perintah ke ESP32 melalui HTTP
+                try:
+                    response = requests.get(f"{ESP32_IP}/unlock", params={"user": best_match}, timeout=3)
+                    print(f"[ESP32] Dikirim via WiFi: {response.text}")
+                except Exception as e:
+                    print(f"[ESP32] Gagal kirim ke ESP32: {e}")
+                
                 return jsonify({"status": "match", "username": best_match, "message": f"Akses diberikan kepada {best_match}"})
-            else:
-                log_audit("SCAN_FAIL", status=f"Jarak minimum={min_distance}")
-                return jsonify({"status": "no_match", "message": "User tidak dikenali"})
 
 @app.route('/enroll', methods=['POST'])
 def enroll_user():

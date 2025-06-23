@@ -1,2 +1,0 @@
-pass=aws_iris_eye_no_eye
-port_db=3306
