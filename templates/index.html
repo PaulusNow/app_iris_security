@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,18 +12,21 @@
             background-color: #f8f9fa;
             padding-top: 20px;
         }
+
         .scanner-container {
             position: relative;
             max-width: 640px;
             margin: 0 auto 20px;
             border-radius: 10px;
             overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
+
         #videoElement {
             width: 100%;
             background-color: #000;
         }
+
         .overlay {
             position: absolute;
             top: 0;
@@ -35,6 +39,7 @@
             align-items: center;
             pointer-events: none;
         }
+
         .scan-circle {
             width: 220px;
             height: 220px;
@@ -43,6 +48,7 @@
             position: relative;
             overflow: hidden;
         }
+
         .scan-line {
             position: absolute;
             top: 0;
@@ -52,10 +58,17 @@
             background: rgba(0, 230, 120, 0.8);
             animation: scan 2s linear infinite;
         }
+
         @keyframes scan {
-            0% { top: 0; }
-            100% { top: 100%; }
+            0% {
+                top: 0;
+            }
+
+            100% {
+                top: 100%;
+            }
         }
+
         .status-panel {
             position: absolute;
             bottom: 20px;
@@ -64,9 +77,10 @@
             text-align: center;
             color: white;
             font-size: 1.2rem;
-            text-shadow: 0 0 8px rgba(0,0,0,0.7);
+            text-shadow: 0 0 8px rgba(0, 0, 0, 0.7);
             font-weight: 500;
         }
+
         .toast-container {
             position: fixed;
             top: 20px;
@@ -74,17 +88,20 @@
             z-index: 1000;
             min-width: 300px;
         }
+
         .action-buttons {
             display: flex;
             justify-content: center;
             gap: 15px;
             margin-top: 20px;
         }
+
         .admin-link {
             position: absolute;
             top: 15px;
             right: 15px;
         }
+
         .register-link {
             position: absolute;
             top: 15px;
@@ -92,15 +109,18 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="text-center mb-4">
             <h1 class="display-5">Sistem Keamanan Iris</h1>
             <p class="lead">Scan iris Anda untuk verifikasi identitas</p>
+
+            <select id="cameraSelect" class="form-select"></select>
         </div>
-        
+
         <div class="scanner-container">
-            <img id="videoElement" src="{{ url_for('video_feed') }}">
+            <video id="videoElement" autoplay playsinline></video>
             <div class="overlay">
                 <div class="scan-circle">
                     <div class="scan-line"></div>
@@ -110,62 +130,40 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="action-buttons">
             <button id="scanButton" class="btn btn-primary btn-lg">
                 <i class="bi bi-camera"></i> Scan Iris
             </button>
         </div>
-        
+
         <a href="/admin" class="btn btn-sm btn-outline-secondary admin-link">
             <i class="bi bi-gear"></i> Admin
         </a>
         <a href="/register" class="btn btn-sm btn-outline-primary register-link">
-            <i class="bi bi-gear"></i> Register
+            <i class="bi bi-person-plus"></i> Register
         </a>
     </div>
-    
-    <!-- Modal untuk Pendaftaran -->
-    <div class="modal fade" id="enrollModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Daftarkan Pengguna Baru</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Iris Anda belum terdaftar. Silakan daftarkan:</p>
-                    <div class="mb-3">
-                        <label for="usernameInput" class="form-label">Nama Pengguna</label>
-                        <input type="text" class="form-control" id="usernameInput" placeholder="Masukkan nama Anda">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="button" class="btn btn-primary" id="saveButton">Simpan</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Toast Notifikasi -->
+
     <div class="toast-container">
         <div id="resultToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="toast-header">
                 <strong class="me-auto">Hasil Scan</strong>
                 <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
             </div>
-            <div class="toast-body" id="toastMessage">
-                <!-- Pesan akan diisi secara dinamis -->
-            </div>
+            <div class="toast-body" id="toastMessage"></div>
         </div>
     </div>
-    
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        $(function() {
+        $(function () {
             const toast = new bootstrap.Toast(document.getElementById('resultToast'));
+            const video = document.getElementById('videoElement');
+            const canvas = document.createElement('canvas');
+            const cameraSelect = document.getElementById('cameraSelect');
+            let stream = null;
 
             function showToast(message, isSuccess) {
                 $('#toastMessage').text(message);
@@ -174,9 +172,68 @@
                 toast.show();
             }
 
-            $('#scanButton').click(function() {
-                $('#scanResult').text('Memproses scan...');
-                $.post('/scan', function(response) {
+            function stopStream() {
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                }
+            }
+
+            function startCamera(deviceId) {
+                stopStream();
+                navigator.mediaDevices.getUserMedia({
+                    video: { deviceId: { exact: deviceId } },
+                    audio: false
+                }).then(s => {
+                    stream = s;
+                    video.srcObject = s;
+                }).catch(err => {
+                    console.warn("Gagal akses kamera:", err);
+                    showToast("Gagal mengakses kamera. Pilih kamera lain.", false);
+                });
+            }
+
+            function populateCameras() {
+                navigator.mediaDevices.enumerateDevices()
+                    .then(devices => {
+                        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                        cameraSelect.innerHTML = '';
+                        videoDevices.forEach((device, index) => {
+                            const option = document.createElement('option');
+                            option.value = device.deviceId;
+                            option.text = device.label || `Kamera ${index + 1}`;
+                            cameraSelect.appendChild(option);
+                        });
+
+                        if (videoDevices.length > 0) {
+                            startCamera(videoDevices[0].deviceId);
+                            cameraSelect.value = videoDevices[0].deviceId;
+                        } else {
+                            showToast("Tidak ada kamera terdeteksi", false);
+                        }
+                    });
+            }
+
+            cameraSelect.addEventListener('change', () => {
+                const selectedId = cameraSelect.value;
+                if (selectedId) startCamera(selectedId);
+            });
+
+            $('#scanButton').click(function () {
+                if (!video.srcObject) {
+                    showToast('Kamera belum aktif', false);
+                    return;
+                }
+
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+
+                const imageBase64 = canvas.toDataURL('image/jpeg');
+
+                $.post('/scan', {
+                    image_base64: imageBase64
+                }, function (response) {
                     if (response.status === 'match') {
                         showToast('Akses diberikan! Selamat datang ' + response.username, true);
                     } else if (response.status === 'no_match') {
@@ -186,13 +243,15 @@
                     } else {
                         showToast('Error: ' + response.message, false);
                     }
-                    $('#scanResult').text('');
-                }).fail(function() {
+                }).fail(function () {
                     showToast('Terjadi kesalahan pada server', false);
-                    $('#scanResult').text('');
                 });
             });
+
+            // Inisialisasi saat halaman dimuat
+            populateCameras();
         });
     </script>
 </body>
+
 </html>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,18 +13,21 @@
             top: 15px;
             left: 15px;
         }
+
         .scanner-container {
             position: relative;
             max-width: 640px;
             margin: 0 auto 20px;
             border-radius: 10px;
             overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
+
         #videoElement {
             width: 100%;
             background-color: #000;
         }
+
         .overlay {
             position: absolute;
             top: 0;
@@ -36,6 +40,7 @@
             align-items: center;
             pointer-events: none;
         }
+
         .scan-circle {
             width: 220px;
             height: 220px;
@@ -44,6 +49,7 @@
             position: relative;
             overflow: hidden;
         }
+
         .scan-line {
             position: absolute;
             top: 0;
@@ -53,10 +59,17 @@
             background: rgba(0, 230, 120, 0.8);
             animation: scan 2s linear infinite;
         }
+
         @keyframes scan {
-            0% { top: 0; }
-            100% { top: 100%; }
+            0% {
+                top: 0;
+            }
+
+            100% {
+                top: 100%;
+            }
         }
+
         .toast-container {
             position: fixed;
             top: 20px;
@@ -68,6 +81,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 </head>
+
 <body>
     <div class="container">
         <a href="/" class="btn btn-sm btn-outline-primary back-link">
@@ -75,20 +89,23 @@
         </a>
 
         <div class="text-center mb-4">
-            <h1 class="display-5">Daftarkan Pengguna Baru</h2>
+            <h1 class="display-5">Daftarkan Pengguna Baru</h1>
             <p class="text-muted">Daftarkan iris anda</p>
+
+            <select id="cameraSelect" class="form-select"></select>
         </div>
 
         <div class="row justify-content-center">
             <div class="col-md-6">
                 <div class="scanner-container">
-                    <img id="videoElement" src="/video_feed">
+                    <video id="videoElement" autoplay playsinline></video>
                     <div class="overlay">
                         <div class="scan-circle">
                             <div class="scan-line"></div>
                         </div>
                     </div>
                 </div>
+
                 <form id="registerForm" class="mt-3">
                     <div class="mb-3">
                         <label for="username" class="form-label">Nama Pengguna</label>
@@ -101,22 +118,23 @@
         </div>
     </div>
 
-    <!-- Toast -->
     <div class="toast-container">
         <div id="resultToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="toast-header">
                 <strong class="me-auto">Hasil Scan</strong>
                 <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
             </div>
-            <div class="toast-body" id="toastMessage">
-                <!-- Pesan akan diisi secara dinamis -->
-            </div>
+            <div class="toast-body" id="toastMessage"></div>
         </div>
     </div>
 
     <script>
-        $(function() {
+        $(function () {
             const toast = new bootstrap.Toast(document.getElementById('resultToast'));
+            const video = document.getElementById('videoElement');
+            const canvas = document.createElement('canvas');
+            const cameraSelect = document.getElementById('cameraSelect');
+            let currentStream = null;
 
             function showToast(message, isSuccess) {
                 $('#toastMessage').text(message);
@@ -125,29 +143,108 @@
                 toast.show();
             }
 
-            $('#registerForm').submit(function(e) {
+            function stopStream() {
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                    currentStream = null;
+                }
+            }
+
+            function startCamera(deviceId) {
+                stopStream();
+                const constraints = {
+                    video: { deviceId: { exact: deviceId } },
+                    audio: false
+                };
+
+                navigator.mediaDevices.getUserMedia(constraints)
+                    .then(stream => {
+                        currentStream = stream;
+                        video.srcObject = stream;
+                    })
+                    .catch(err => {
+                        console.warn("Gagal akses kamera:", err.name);
+                        showToast("Gagal mengakses kamera. Pilih kamera lain.", false);
+                    });
+            }
+
+            function populateCameraList() {
+                navigator.mediaDevices.enumerateDevices()
+                    .then(devices => {
+                        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                        cameraSelect.innerHTML = '';
+
+                        if (videoDevices.length === 0) {
+                            const opt = document.createElement('option');
+                            opt.text = "Tidak ada kamera ditemukan";
+                            cameraSelect.appendChild(opt);
+                            return;
+                        }
+
+                        videoDevices.forEach((device, index) => {
+                            const option = document.createElement('option');
+                            option.value = device.deviceId;
+                            option.text = device.label || `Kamera ${index + 1}`;
+                            cameraSelect.appendChild(option);
+                        });
+
+                        // Pilih dan aktifkan kamera pertama
+                        startCamera(videoDevices[0].deviceId);
+                        cameraSelect.value = videoDevices[0].deviceId;
+                    })
+                    .catch(err => {
+                        console.error("Gagal mendeteksi kamera:", err);
+                        showToast("Gagal mendeteksi kamera", false);
+                    });
+            }
+
+            cameraSelect.addEventListener('change', () => {
+                const selectedDeviceId = cameraSelect.value;
+                if (selectedDeviceId) startCamera(selectedDeviceId);
+            });
+
+            $('#registerForm').submit(function (e) {
                 e.preventDefault();
                 const username = $('#username').val().trim();
                 if (!username) {
                     alert('Nama pengguna wajib diisi');
                     return;
                 }
+
+                if (!video.srcObject) {
+                    showToast('Kamera belum aktif', false);
+                    return;
+                }
+
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                const imageBase64 = canvas.toDataURL('image/jpeg');
+
                 $('#registerResult').text('Memproses pendaftaran...');
 
-                $.post('/do_register', { username: username }, function(response) {
+                $.post('/do_register', {
+                    username: username,
+                    image_base64: imageBase64
+                }, function (response) {
+                    $('#registerResult').html('');
                     if (response.status === 'success') {
                         showToast(response.message, true);
-                        $('#registerResult').html('');
                         $('#username').val('');
                     } else {
                         showToast(response.message, false);
-                        $('#registerResult').html('');
                     }
-                }).fail(function() {
+                }).fail(function () {
                     showToast('Terjadi kesalahan pada server', false);
+                    $('#registerResult').html('');
                 });
             });
+
+            // Inisialisasi saat halaman pertama kali load
+            populateCameraList();
         });
     </script>
+
 </body>
+
 </html>
