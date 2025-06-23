@@ -136,10 +136,10 @@
             const cameraSelect = document.getElementById('cameraSelect');
             let currentStream = null;
 
-            function showToast(message, isSuccess) {
-                $('#toastMessage').text(message);
+            function showToast(msg, success = true) {
+                $('#toastMessage').text(msg);
                 $('#resultToast').removeClass('bg-success bg-danger');
-                $('#resultToast').addClass(isSuccess ? 'bg-success text-white' : 'bg-danger text-white');
+                $('#resultToast').addClass(success ? 'bg-success text-white' : 'bg-danger text-white');
                 toast.show();
             }
 
@@ -152,69 +152,69 @@
 
             function startCamera(deviceId) {
                 stopStream();
-                const constraints = {
+                navigator.mediaDevices.getUserMedia({
                     video: { deviceId: { exact: deviceId } },
                     audio: false
-                };
-
-                navigator.mediaDevices.getUserMedia(constraints)
-                    .then(stream => {
-                        currentStream = stream;
-                        video.srcObject = stream;
-                    })
-                    .catch(err => {
-                        console.warn("Gagal akses kamera:", err.name);
-                        showToast("Gagal mengakses kamera. Pilih kamera lain.", false);
-                    });
+                }).then(stream => {
+                    currentStream = stream;
+                    video.srcObject = stream;
+                }).catch(() => {
+                    showToast("Gagal mengakses kamera", false);
+                });
             }
 
             function populateCameraList() {
-                navigator.mediaDevices.enumerateDevices()
+                const select = $('#cameraSelect');
+                select.empty();
+                select.append('<option value="">Mendeteksi kamera... Mohon tunggu</option>');
+
+                if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+                    showToast("Browser tidak mendukung enumerasi kamera (mungkin karena HTTP)", false);
+                    select.empty().append('<option value="">Enumerasi kamera tidak didukung</option>');
+                    return;
+                }
+
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(tempStream => {
+                        tempStream.getTracks().forEach(track => track.stop());
+                        return navigator.mediaDevices.enumerateDevices();
+                    })
                     .then(devices => {
-                        const videoDevices = devices.filter(device => device.kind === 'videoinput');
-                        cameraSelect.innerHTML = '';
+                        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+                        select.empty();
 
                         if (videoDevices.length === 0) {
-                            const opt = document.createElement('option');
-                            opt.text = "Tidak ada kamera ditemukan";
-                            cameraSelect.appendChild(opt);
+                            select.append('<option value="">Tidak ada kamera terdeteksi</option>');
                             return;
                         }
 
                         videoDevices.forEach((device, index) => {
-                            const option = document.createElement('option');
-                            option.value = device.deviceId;
-                            option.text = device.label || `Kamera ${index + 1}`;
-                            cameraSelect.appendChild(option);
+                            const opt = document.createElement('option');
+                            opt.value = device.deviceId;
+                            opt.text = device.label || `Kamera ${index + 1}`;
+                            select.append(opt);
                         });
 
-                        // Pilih dan aktifkan kamera pertama
                         startCamera(videoDevices[0].deviceId);
-                        cameraSelect.value = videoDevices[0].deviceId;
+                        select.val(videoDevices[0].deviceId);
                     })
-                    .catch(err => {
-                        console.error("Gagal mendeteksi kamera:", err);
-                        showToast("Gagal mendeteksi kamera", false);
+                    .catch(() => {
+                        select.empty();
+                        select.append('<option value="">Gagal mendeteksi kamera</option>');
+                        showToast("Gagal akses kamera", false);
                     });
             }
 
             cameraSelect.addEventListener('change', () => {
-                const selectedDeviceId = cameraSelect.value;
-                if (selectedDeviceId) startCamera(selectedDeviceId);
+                const selectedId = cameraSelect.value;
+                if (selectedId) startCamera(selectedId);
             });
 
             $('#registerForm').submit(function (e) {
                 e.preventDefault();
                 const username = $('#username').val().trim();
-                if (!username) {
-                    alert('Nama pengguna wajib diisi');
-                    return;
-                }
-
-                if (!video.srcObject) {
-                    showToast('Kamera belum aktif', false);
-                    return;
-                }
+                if (!username) return alert('Nama pengguna wajib diisi');
+                if (!video.srcObject) return showToast('Kamera belum aktif', false);
 
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
@@ -223,24 +223,16 @@
 
                 $('#registerResult').text('Memproses pendaftaran...');
 
-                $.post('/do_register', {
-                    username: username,
-                    image_base64: imageBase64
-                }, function (response) {
+                $.post('/do_register', { username, image_base64 }, res => {
                     $('#registerResult').html('');
-                    if (response.status === 'success') {
-                        showToast(response.message, true);
-                        $('#username').val('');
-                    } else {
-                        showToast(response.message, false);
-                    }
-                }).fail(function () {
+                    showToast(res.message, res.status === 'success');
+                    if (res.status === 'success') $('#username').val('');
+                }).fail(() => {
                     showToast('Terjadi kesalahan pada server', false);
                     $('#registerResult').html('');
                 });
             });
 
-            // Inisialisasi saat halaman pertama kali load
             populateCameraList();
         });
     </script>
