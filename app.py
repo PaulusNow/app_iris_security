@@ -16,7 +16,6 @@ import requests
 import base64
 from io import BytesIO
 from PIL import Image
-import mysql.connector
 
 app = Flask(__name__)
 
