@@ -290,6 +290,7 @@ def enroll_user():
 
 @app.route('/audit_logs')
 def get_audit_logs():
+    connection = None
     try:
         connection = get_db_connection()
         with connection.cursor() as cursor:
@@ -308,6 +309,7 @@ def admin_dashboard():
 
 @app.route('/admin/users')
 def get_users():
+    connection = None
     try:
         connection = get_db_connection()
         with connection.cursor() as cursor:
@@ -322,6 +324,7 @@ def get_users():
 
 @app.route('/admin/delete_user/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
+    connection = None
     try:
         connection = get_db_connection()
         with connection.cursor() as cursor:
@@ -517,6 +520,7 @@ def do_register_client():
 
 @app.route('/system_status')
 def system_status():
+    connection = None
     status = {
         # "webcam": webcam.is_active(),
         "database": "OK",
