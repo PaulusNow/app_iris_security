@@ -22,7 +22,7 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
 
-        #videoElement {
+        #clientVideo {
             width: 100%;
             background-color: #000;
         }
@@ -38,6 +38,16 @@
             justify-content: center;
             align-items: center;
             pointer-events: none;
+        }
+
+        @keyframes scan {
+            0% {
+                top: 0;
+            }
+
+            100% {
+                top: 100%;
+            }
         }
 
         .scan-circle {
@@ -57,28 +67,6 @@
             height: 3px;
             background: rgba(0, 230, 120, 0.8);
             animation: scan 2s linear infinite;
-        }
-
-        @keyframes scan {
-            0% {
-                top: 0;
-            }
-
-            100% {
-                top: 100%;
-            }
-        }
-
-        .status-panel {
-            position: absolute;
-            bottom: 20px;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            color: white;
-            font-size: 1.2rem;
-            text-shadow: 0 0 8px rgba(0, 0, 0, 0.7);
-            font-weight: 500;
         }
 
         .toast-container {
@@ -115,26 +103,27 @@
         <div class="text-center mb-4">
             <h1 class="display-5">Sistem Keamanan Iris</h1>
             <p class="lead">Scan iris Anda untuk verifikasi identitas</p>
-
-            <select id="cameraSelect" class="form-select"></select>
         </div>
 
-        <div class="scanner-container">
-            <video id="videoElement" autoplay playsinline></video>
-            <div class="overlay">
-                <div class="scan-circle">
-                    <div class="scan-line"></div>
-                </div>
-                <div class="status-panel" id="statusText">
-                    Arahkan mata ke dalam lingkaran
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <label for="cameraSelect" class="form-label">Pilih Kamera</label>
+                <select id="cameraSelect" class="form-select mb-3"></select>
+            </div>
+            <div class="scanner-container">
+                <video id="clientVideo" autoplay playsinline></video>
+                <div class="overlay">
+                    <div class="scan-circle">
+                        <div class="scan-line"></div>
+                    </div>
                 </div>
             </div>
-        </div>
-
-        <div class="action-buttons">
-            <button id="scanButton" class="btn btn-primary btn-lg">
-                <i class="bi bi-camera"></i> Scan Iris
-            </button>
+            <canvas id="clientCanvas" style="display:none;"></canvas>
+            <div class="action-buttons">
+                <button id="scanButton" class="btn btn-primary btn-lg">
+                    <i class="bi bi-camera"></i> Scan Iris
+                </button>
+            </div>
         </div>
 
         <a href="/admin" class="btn btn-sm btn-outline-secondary admin-link">
@@ -145,6 +134,7 @@
         </a>
     </div>
 
+    <!-- Toast Notifikasi -->
     <div class="toast-container">
         <div id="resultToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="toast-header">
@@ -158,108 +148,92 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        $(function () {
-            const toast = new bootstrap.Toast(document.getElementById('resultToast'));
-            const video = document.getElementById('videoElement');
-            const canvas = document.createElement('canvas');
-            const cameraSelect = document.getElementById('cameraSelect');
-            let stream = null;
+        const video = document.getElementById('clientVideo');
+        const canvas = document.getElementById('clientCanvas');
+        const toast = new bootstrap.Toast(document.getElementById('resultToast'));
+        const cameraSelect = document.getElementById('cameraSelect');
+        let currentStream = null;
 
-            function showToast(message, isSuccess) {
-                $('#toastMessage').text(message);
-                $('#resultToast').removeClass('bg-success bg-danger');
-                $('#resultToast').addClass(isSuccess ? 'bg-success text-white' : 'bg-danger text-white');
-                toast.show();
+        function showToast(message, type) {
+            $('#toastMessage').text(message);
+            $('#resultToast').removeClass('bg-success bg-danger bg-warning text-white text-dark');
+
+            if (type === true) {
+                $('#resultToast').addClass('bg-success text-white');
+            } else if (type === 'warning') {
+                $('#resultToast').addClass('bg-warning text-dark');
+            } else {
+                $('#resultToast').addClass('bg-danger text-white');
             }
 
-            function stopStream() {
-                if (stream) {
-                    stream.getTracks().forEach(track => track.stop());
-                    stream = null;
-                }
-            }
+            toast.show();
+        }
 
-            function startCamera(deviceId) {
-                stopStream();
-                navigator.mediaDevices.getUserMedia({
-                    video: { deviceId: { exact: deviceId } },
-                    audio: false
-                }).then(s => {
-                    stream = s;
-                    video.srcObject = stream;
-                }).catch(err => {
-                    showToast("Gagal mengakses kamera. Pilih kamera lain.", false);
+        function stopCurrentStream() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+            }
+        }
+
+        function startCamera(deviceId) {
+            stopCurrentStream();
+
+            navigator.mediaDevices.getUserMedia({
+                video: { deviceId: deviceId ? { exact: deviceId } : undefined }
+            }).then(stream => {
+                currentStream = stream;
+                video.srcObject = stream;
+            }).catch(err => {
+                console.error('Gagal akses kamera:', err);
+                showToast('Gagal akses kamera', false);
+            });
+        }
+
+        function listCameras() {
+            navigator.mediaDevices.enumerateDevices().then(devices => {
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                cameraSelect.innerHTML = '';
+                videoDevices.forEach((device, index) => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `Kamera ${index + 1}`;
+                    cameraSelect.appendChild(option);
                 });
-            }
 
-            function populateCameras() {
-                const select = $('#cameraSelect');
-                select.empty();
-                select.append('<option value="">Mendeteksi kamera... Mohon tunggu</option>');
-
-                if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-                    showToast("Browser tidak mendukung enumerasi kamera (mungkin karena HTTP)", false);
-                    select.empty();
-                    select.append('<option value="">Enumerasi kamera tidak didukung</option>');
-                    return;
+                if (videoDevices.length > 0) {
+                    startCamera(videoDevices[0].deviceId);
                 }
-
-                navigator.mediaDevices.getUserMedia({ video: true })
-                    .then(tempStream => {
-                        tempStream.getTracks().forEach(track => track.stop());
-                        return navigator.mediaDevices.enumerateDevices();
-                    })
-                    .then(devices => {
-                        const videoDevices = devices.filter(d => d.kind === 'videoinput');
-                        select.empty();
-
-                        if (videoDevices.length === 0) {
-                            select.append('<option value="">Tidak ada kamera terdeteksi</option>');
-                            return;
-                        }
-
-                        videoDevices.forEach((device, index) => {
-                            const opt = document.createElement('option');
-                            opt.value = device.deviceId;
-                            opt.text = device.label || `Kamera ${index + 1}`;
-                            select.appendChild(opt);
-                        });
-
-                        startCamera(videoDevices[0].deviceId);
-                        select.val(videoDevices[0].deviceId);
-                    })
-                    .catch(() => {
-                        select.empty();
-                        select.append('<option value="">Gagal mendeteksi kamera</option>');
-                        showToast("Gagal mengakses kamera", false);
-                    });
-            }
-
-            cameraSelect.addEventListener('change', () => {
-                const selectedId = cameraSelect.value;
-                if (selectedId) startCamera(selectedId);
             });
+        }
 
-            $('#scanButton').click(() => {
-                if (!video.srcObject) {
-                    showToast('Kamera belum aktif', false);
-                    return;
+        cameraSelect.addEventListener('change', () => {
+            const deviceId = cameraSelect.value;
+            startCamera(deviceId);
+        });
+
+        // Inisialisasi
+        listCameras();
+
+        $('#scanButton').click(() => {
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            const base64 = canvas.toDataURL('image/jpeg');
+
+            $.ajax({
+                url: '/scan_client',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ image: base64 }),
+                success: function (res) {
+                    const type = res.status === 'match' ? true : res.status === 'esp32_offline' ? 'warning' : false;
+                    showToast(res.message, type);
+                },
+                error: function () {
+                    showToast("Terjadi kesalahan pada server", false);
                 }
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                canvas.getContext('2d').drawImage(video, 0, 0);
-                const imageBase64 = canvas.toDataURL('image/jpeg');
-
-                $.post('/scan', { image_base64: imageBase64 }, res => {
-                    if (res.status === 'match') {
-                        showToast(`Akses diberikan! Selamat datang ${res.username}`, true);
-                    } else {
-                        showToast(res.message || 'Gagal scan.', false);
-                    }
-                }).fail(() => showToast('Gagal koneksi ke server', false));
             });
-
-            populateCameras();
         });
     </script>
 </body>

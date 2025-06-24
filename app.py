@@ -20,17 +20,17 @@ from PIL import Image
 app = Flask(__name__)
 
 # ===== CONFIGURATION =====
-MYSQL_HOST = os.environ.get('MYSQL_HOST', 'iris-security.criyqeisgk0r.ap-southeast-2.rds.amazonaws.com')
-MYSQL_USER = os.environ.get('MYSQL_USER', 'admin')
-MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'aws_iris_eye_no_eye')
-MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
-MYSQL_CHARSET = 'utf8mb4'
-
-# MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
-# MYSQL_USER = os.environ.get('MYSQL_USER', 'iris_app')
-# MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'password_kuat123!')
+# MYSQL_HOST = os.environ.get('MYSQL_HOST', 'iris-security.criyqeisgk0r.ap-southeast-2.rds.amazonaws.com')
+# MYSQL_USER = os.environ.get('MYSQL_USER', 'admin')
+# MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'aws_iris_eye_no_eye')
 # MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
 # MYSQL_CHARSET = 'utf8mb4'
+
+MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
+MYSQL_USER = os.environ.get('MYSQL_USER', 'iris_app')
+MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'password_kuat123!')
+MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
+MYSQL_CHARSET = 'utf8mb4'
 
 AES_KEY = os.environ.get('AES_KEY', 'my_super_secret_key_32bytes').ljust(32)[:32].encode()
 ESP32_IP = os.environ.get('ESP32_IP', 'http://10.10.10.190')
@@ -47,79 +47,37 @@ except Exception as e:
     model = None
 
 # ===== WEBCAM MANAGER =====
-class WebcamManager:
-    def __init__(self):
-        self.cap = None
-        self.lock = threading.Lock()
-        self.running = True
-        self.latest_frame = None
-        self.thread = None
-        
-        # Coba buka kamera dengan berbagai backend
-        self.cap = self.open_camera()
-        if self.cap and self.cap.isOpened():
-            print("[INFO] Kamera berhasil dibuka")
-            self.thread = threading.Thread(target=self.update_frames, daemon=True)
-            self.thread.start()
-        else:
-            print("[ERROR] Tidak ada kamera yang bisa diakses")
+# class WebcamManager:
+#     def __init__(self):
+#         self.cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+#         self.lock = threading.Lock()
+#         self.running = True
+#         self.latest_frame = None
+#         self.thread = threading.Thread(target=self.update_frames, daemon=True)
+#         self.thread.start()
 
-    def open_camera(self, max_tries=3):
-        # Daftar backend yang akan dicoba
-        backends = [
-            cv2.CAP_ANY,        # Auto-detect
-            cv2.CAP_DSHOW,      # DirectShow (Windows)
-            cv2.CAP_MSMF,       # Media Foundation (Windows)
-            cv2.CAP_V4L2,       # V4L2 (Linux)
-            cv2.CAP_AVFOUNDATION # AVFoundation (macOS)
-        ]
-        
-        for backend in backends:
-            for i in range(max_tries):
-                try:
-                    cap = cv2.VideoCapture(i, backend)
-                    if cap.isOpened():
-                        # Coba baca frame untuk memastikan
-                        ret, frame = cap.read()
-                        if ret:
-                            print(f"[INFO] Berhasil membuka kamera index {i} dengan backend {backend}")
-                            return cap
-                        cap.release()
-                except Exception as e:
-                    print(f"[WARN] Error saat mencoba backend {backend}: {str(e)}")
-        
-        print("[ERROR] Semua backend gagal membuka kamera")
-        return None
+#     def update_frames(self):
+#         while self.running:
+#             with self.lock:
+#                 if self.cap.isOpened():
+#                     ret, frame = self.cap.read()
+#                     if ret:
+#                         self.latest_frame = frame
+#             time.sleep(0.03)
 
-    def update_frames(self):
-        while self.running:
-            if self.cap is None:
-                time.sleep(1)
-                continue
-                
-            with self.lock:
-                if self.cap.isOpened():
-                    ret, frame = self.cap.read()
-                    if ret:
-                        self.latest_frame = frame
-            time.sleep(0.03)
+#     def get_frame(self):
+#         with self.lock:
+#             return self.latest_frame.copy() if self.latest_frame is not None else None
 
-    def get_frame(self):
-        with self.lock:
-            return self.latest_frame.copy() if self.latest_frame is not None else None
+#     def stop(self):
+#         self.running = False
+#         self.thread.join()
+#         self.cap.release()
 
-    def stop(self):
-        self.running = False
-        if self.thread:
-            self.thread.join(timeout=2.0)
-        if self.cap:
-            self.cap.release()
-        print("[INFO] Kamera ditutup")
+#     def is_active(self):
+#         return self.cap.isOpened()
 
-    def is_active(self):
-        return self.cap is not None and self.cap.isOpened()
-    
-webcam = WebcamManager()
+# webcam = WebcamManager()
 
 # ===== IRIS PROCESSOR (IMPLEMENTING PAPER METHODS) =====
 # Tambahkan kembali fungsi calculate_distance ke dalam IrisProcessor
@@ -280,86 +238,77 @@ def init_db():
 def index():
     return render_template('index.html')
 
-@app.route('/video_feed')
-def video_feed():
-    def generate():
-        while True:
-            frame = webcam.get_frame()
-            if frame is None:
-                # Buat frame kosong (hitam) dengan pesan error
-                frame = np.zeros((480, 640, 3), dtype=np.uint8)
-                cv2.putText(frame, "Kamera tidak tersedia", (50, 240), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+# @app.route('/video_feed')
+# def video_feed():
+#     def generate():
+#         while True:
+#             frame = webcam.get_frame()
+#             if frame is None:
+#                 continue
 
-            ret, jpeg = cv2.imencode('.jpg', frame)
-            frame_bytes = jpeg.tobytes()
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n\r\n')
-            time.sleep(0.03)
-    
-    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+#             ret, jpeg = cv2.imencode('.jpg', frame)
+#             frame_bytes = jpeg.tobytes()
+#             yield (b'--frame\r\n'
+#                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n\r\n')
+#             time.sleep(0.03)
+#     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-@app.route('/scan', methods=['POST'])
-def scan():
-    image_data = request.form.get('image_base64')
+# @app.route('/scan', methods=['POST'])
+# def scan():
+#     img = webcam.get_frame()
+#     if img is None:
+#         print("[ERROR] Tidak dapat mengambil gambar dari webcam.")
+#         return jsonify({"status": "error", "message": "Gagal mengambil gambar"})
 
-    if not image_data:
-        return jsonify({"status": "error", "message": "Gambar tidak ditemukan"})
+#     if predict_eye_noeye(img) != "eye":
+#         print("[INFO] Gambar bukan iris yang valid.")
+#         return jsonify({"status": "noeye", "message": "Iris tidak terdeteksi"})
 
-    try:
-        # Decode base64 ke OpenCV image
-        header, encoded = image_data.split(",", 1)
-        img_bytes = base64.b64decode(encoded)
-        img_pil = Image.open(BytesIO(img_bytes)).convert('RGB')
-        img = np.array(img_pil)
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+#     gray = iris_processor.preprocess_image(img)
+#     pupil = iris_processor.detect_pupil(gray)
+#     iris = iris_processor.detect_iris(gray, pupil)
+#     if pupil is None or iris is None:
+#         print("[ERROR] Segmentasi pupil atau iris gagal.")
+#         return jsonify({"status": "error", "message": "Segmentasi gagal"})
 
-        if predict_eye_noeye(img) != "eye":
-            return jsonify({"status": "noeye", "message": "Iris tidak terdeteksi"})
+#     normalized = iris_processor.normalize_iris(img, pupil, iris)
+#     template_bytes, _ = iris_processor.extract_features(normalized)
 
-        gray = iris_processor.preprocess_image(img)
-        pupil = iris_processor.detect_pupil(gray)
-        iris = iris_processor.detect_iris(gray, pupil)
-        if pupil is None or iris is None:
-            return jsonify({"status": "error", "message": "Segmentasi gagal"})
+#     if not template_bytes:
+#         print("[ERROR] Gagal mengekstrak fitur iris.")
+#         return jsonify({"status": "error", "message": "Gagal mengekstrak template iris"})
 
-        normalized = iris_processor.normalize_iris(img, pupil, iris)
-        template_bytes, _ = iris_processor.extract_features(normalized)
+#     with get_db_connection() as conn:
+#         with conn.cursor() as cursor:
+#             cursor.execute("SELECT username, iris_template FROM iris_data")
+#             best_match = None
+#             min_distance = float('inf')
 
-        if not template_bytes:
-            return jsonify({"status": "error", "message": "Gagal mengekstrak template iris"})
+#             for row in cursor.fetchall():
+#                 try:
+#                     decrypted_template = decrypt_data(row['iris_template'])
+#                     distance = iris_processor.calculate_distance(template_bytes, decrypted_template)
+#                     print(f"[DEBUG] Distance to {row['username']}: {distance}")
+#                     if distance < min_distance:
+#                         min_distance = distance
+#                         best_match = row['username']
+#                 except Exception as e:
+#                     print(f"[ERROR] Gagal mendekripsi atau menghitung jarak untuk {row['username']}: {e}")
+#                     continue
 
-        with get_db_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT username, iris_template FROM iris_data")
-                best_match = None
-                min_distance = float('inf')
-
-                for row in cursor.fetchall():
-                    try:
-                        decrypted_template = decrypt_data(row['iris_template'])
-                        distance = iris_processor.calculate_distance(template_bytes, decrypted_template)
-                        if distance < min_distance:
-                            min_distance = distance
-                            best_match = row['username']
-                    except Exception as e:
-                        continue
-
-            if min_distance < 475:
-                log_audit("SCAN_SUCCESS", username=best_match, status=f"distance={min_distance}")
+#             if min_distance < 475:
+#                 log_audit("SCAN_SUCCESS", username=best_match, status=f"distance={min_distance}")
                 
-                # Kirim perintah ke ESP32 melalui HTTP
-                try:
-                    response = requests.get(f"{ESP32_IP}/unlock", params={"user": best_match}, timeout=3)
-                    print(f"[ESP32] Dikirim via WiFi: {response.text}")
-                except Exception as e:
-                    print(f"[ESP32] Gagal kirim ke ESP32: {e}")
-                
-                return jsonify({"status": "match", "username": best_match, "message": f"Akses diberikan kepada {best_match}"})
-    except Exception as e:
-        print(f"[ERROR SCAN] {e}")
-        return jsonify({"status": "error", "message": "Terjadi kesalahan saat memproses gambar"})
+#                 try:
+#                     response = requests.get(f"{ESP32_IP}/unlock", params={"user": best_match}, timeout=3)
+#                     print(f"[ESP32] Dikirim via WiFi: {response.text}")
+#                     return jsonify({"status": "match", "username": best_match, "message": f"Akses diberikan kepada {best_match}"})
+#                 except Exception as e:
+#                     print(f"[ESP32] Gagal kirim ke ESP32: {e}")
+#                     return jsonify({"status": "esp32_offline", "username": best_match, "message": "Verifikasi Sukses, namun Modul ESP32 sedang Offline"})
 
+#             return jsonify({"status": "no_match", "message": "User tidak dikenali"})
+                
 @app.route('/enroll', methods=['POST'])
 def enroll_user():
 
@@ -372,12 +321,12 @@ def enroll_user():
             "message": "Username diperlukan"
         })
 
-    image = webcam.get_frame()
-    if image is None:
-        return jsonify({
-            "status": "error",
-            "message": "Gagal mengambil gambar dari kamera"
-        })
+    # image = webcam.get_frame()
+    # if image is None:
+    #     return jsonify({
+    #         "status": "error",
+    #         "message": "Gagal mengambil gambar dari kamera"
+    #     })
 
     try:
         # Preprocessing
@@ -508,79 +457,178 @@ def delete_user(user_id):
 def register_page():
     return render_template('register.html')
 
-@app.route('/do_register', methods=['POST'])
-def do_register():
-    username = request.form.get('username')
-    image_data = request.form.get('image_base64')
+# @app.route('/do_register', methods=['POST'])
+# def do_register():
+#     username = request.form.get('username')
+#     if not username:
+#         return jsonify({"status": "error", "message": "Username wajib diisi"})
 
-    if not username or not image_data:
-        return jsonify({"status": "error", "message": "Username dan gambar wajib dikirim"})
+#     img = webcam.get_frame()
+#     if img is None:
+#         return jsonify({"status": "error", "message": "Gagal mengambil gambar"})
 
+#     gray = iris_processor.preprocess_image(img)
+#     pupil = iris_processor.detect_pupil(gray)
+#     iris = iris_processor.detect_iris(gray, pupil)
+#     if pupil is None or iris is None:
+#         return jsonify({"status": "error", "message": "Segmentasi iris gagal, mohon ulangi."})
+
+#     if iris[2] - pupil[2] < 5:
+#         print(f"[DEBUG] Pupil: {pupil}, Iris: {iris}")
+#         return jsonify({"status": "error", "message": "Jarak pupil dan iris terlalu kecil"})
+
+#     normalized = iris_processor.normalize_iris(img, pupil, iris)
+#     template_bytes, mask_bytes = iris_processor.extract_features(normalized)
+
+#     if not template_bytes:
+#         return jsonify({"status": "error", "message": "Template iris gagal diproses"})
+
+#     # Validasi stabilitas template
+#     self_distance = iris_processor.calculate_distance(template_bytes, template_bytes)
+#     print(f"[DEBUG] Self distance: {self_distance}")
+#     if self_distance > 20:
+#         return jsonify({"status": "error", "message": "Scan tidak stabil, harap ulangi."})
+
+#     encrypted_template = encrypt_data(template_bytes)
+#     encrypted_mask = encrypt_data(mask_bytes)
+
+#     with get_db_connection() as conn:
+#         with conn.cursor() as cursor:
+#             # Cek username duplikat
+#             cursor.execute("SELECT username FROM iris_data WHERE username = %s", (username,))
+#             if cursor.fetchone():
+#                 return jsonify({"status": "error", "message": f"Username '{username}' sudah terdaftar"})
+
+#             # Cek kemiripan iris
+#             cursor.execute("SELECT username, iris_template FROM iris_data")
+#             for row in cursor.fetchall():
+#                 try:
+#                     decrypted_template = decrypt_data(row['iris_template'])
+#                     distance = iris_processor.calculate_distance(template_bytes, decrypted_template)
+#                     print(f"[DEBUG] Distance to {row['username']}: {distance}")
+
+#                     if distance < 475:
+#                         log_audit("REGISTER_FAIL_DUPLICATE", username=username, status=f"Mirip {row['username']} distance={distance}")
+#                         return jsonify({"status": "error", "message": f"Iris sudah terdaftar sebagai '{row['username']}'"})
+#                     elif distance < 650:
+#                         log_audit("REGISTER_SUSPICIOUS_DUPLICATE", username=username, status=f"Terlalu mirip {row['username']} distance={distance}")
+#                         return jsonify({"status": "error", "message": f"Iris terlalu mirip dengan '{row['username']}', mohon pastikan ini pengguna berbeda."})
+#                 except Exception as e:
+#                     continue
+
+#             cursor.execute("INSERT INTO iris_data (username, iris_template, iris_mask) VALUES (%s, %s, %s)", (username, encrypted_template, encrypted_mask))
+#             conn.commit()
+#             log_audit("USER_REGISTERED", username=username, status="success")
+#             return jsonify({"status": "success", "message": "Pendaftaran berhasil", "username": username})
+        
+def base64_to_cv2(base64_data):
     try:
-        # Decode base64 ke OpenCV image
-        header, encoded = image_data.split(",", 1)
+        header, encoded = base64_data.split(',', 1)
         img_bytes = base64.b64decode(encoded)
-        img_pil = Image.open(BytesIO(img_bytes)).convert('RGB')
-        img = np.array(img_pil)
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-
-        gray = iris_processor.preprocess_image(img)
-        pupil = iris_processor.detect_pupil(gray)
-        iris = iris_processor.detect_iris(gray, pupil)
-        if pupil is None or iris is None:
-            return jsonify({"status": "error", "message": "Segmentasi iris gagal, mohon ulangi."})
-
-        if iris[2] - pupil[2] < 5:
-            print(f"[DEBUG] Pupil: {pupil}, Iris: {iris}")
-            return jsonify({"status": "error", "message": "Jarak pupil dan iris terlalu kecil"})
-
-        normalized = iris_processor.normalize_iris(img, pupil, iris)
-        template_bytes, mask_bytes = iris_processor.extract_features(normalized)
-
-        if not template_bytes:
-            return jsonify({"status": "error", "message": "Template iris gagal diproses"})
-
-        self_distance = iris_processor.calculate_distance(template_bytes, template_bytes)
-        print(f"[DEBUG] Self distance: {self_distance}")
-        if self_distance > 20:
-            return jsonify({"status": "error", "message": "Scan tidak stabil, harap ulangi."})
-
-        encrypted_template = encrypt_data(template_bytes)
-        encrypted_mask = encrypt_data(mask_bytes)
-
-        with get_db_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT username FROM iris_data WHERE username = %s", (username,))
-                if cursor.fetchone():
-                    return jsonify({"status": "error", "message": f"Username '{username}' sudah terdaftar"})
-
-                cursor.execute("SELECT username, iris_template FROM iris_data")
-                for row in cursor.fetchall():
-                    try:
-                        decrypted_template = decrypt_data(row['iris_template'])
-                        distance = iris_processor.calculate_distance(template_bytes, decrypted_template)
-                        print(f"[DEBUG] Distance to {row['username']}: {distance}")
-                        if distance < 475:
-                            return jsonify({"status": "error", "message": f"Iris sudah terdaftar sebagai '{row['username']}'"})
-                        elif distance < 650:
-                            return jsonify({"status": "error", "message": f"Iris terlalu mirip dengan '{row['username']}'" })
-                    except Exception as e:
-                        continue
-
-                cursor.execute("INSERT INTO iris_data (username, iris_template, iris_mask) VALUES (%s, %s, %s)",
-                               (username, encrypted_template, encrypted_mask))
-                conn.commit()
-                log_audit("USER_REGISTERED", username=username, status="success")
-                return jsonify({"status": "success", "message": "Pendaftaran berhasil", "username": username})
-
+        img = Image.open(BytesIO(img_bytes)).convert('RGB')
+        return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
     except Exception as e:
-        print(f"[ERROR] {e}")
-        return jsonify({"status": "error", "message": "Terjadi kesalahan saat memproses gambar"})
+        print(f"[ERROR] Failed to convert base64: {e}")
+        return None
+    
+@app.route('/scan_client', methods=['POST'])
+def scan_client():
+    data = request.json
+    base64_image = data.get('image')
+    img = base64_to_cv2(base64_image)
+    if img is None:
+        return jsonify({"status": "error", "message": "Gambar tidak valid"})
+
+    # Lanjutkan proses seperti di /scan
+    if predict_eye_noeye(img) != "eye":
+        return jsonify({"status": "noeye", "message": "Iris tidak terdeteksi"})
+
+    gray = iris_processor.preprocess_image(img)
+    pupil = iris_processor.detect_pupil(gray)
+    iris = iris_processor.detect_iris(gray, pupil)
+    if pupil is None or iris is None:
+        return jsonify({"status": "error", "message": "Segmentasi gagal"})
+
+    normalized = iris_processor.normalize_iris(img, pupil, iris)
+    template_bytes, _ = iris_processor.extract_features(normalized)
+    if not template_bytes:
+        return jsonify({"status": "error", "message": "Template gagal diproses"})
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT username, iris_template FROM iris_data")
+            best_match = None
+            min_distance = float('inf')
+
+            for row in cursor.fetchall():
+                try:
+                    decrypted_template = decrypt_data(row['iris_template'])
+                    distance = iris_processor.calculate_distance(template_bytes, decrypted_template)
+                    if distance < min_distance:
+                        min_distance = distance
+                        best_match = row['username']
+                except:
+                    continue
+
+            if min_distance < 475:
+                log_audit("SCAN_SUCCESS", username=best_match, status=f"distance={min_distance}")
+                try:
+                    response = requests.get(f"{ESP32_IP}/unlock", params={"user": best_match}, timeout=3)
+                    return jsonify({"status": "match", "username": best_match, "message": f"Akses diberikan kepada {best_match}"})
+                except:
+                    return jsonify({"status": "esp32_offline", "username": best_match, "message": "Verifikasi Sukses, namun Modul ESP32 sedang Offline"})
+
+    return jsonify({"status": "no_match", "message": "User tidak dikenali"})
+
+@app.route('/do_register_client', methods=['POST'])
+def do_register_client():
+    data = request.json
+    username = data.get('username')
+    base64_image = data.get('image')
+
+    if not username or not base64_image:
+        return jsonify({"status": "error", "message": "Data tidak lengkap"})
+
+    img = base64_to_cv2(base64_image)
+    if img is None:
+        return jsonify({"status": "error", "message": "Gambar tidak valid"})
+
+    gray = iris_processor.preprocess_image(img)
+    pupil = iris_processor.detect_pupil(gray)
+    iris = iris_processor.detect_iris(gray, pupil)
+    if pupil is None or iris is None:
+        return jsonify({"status": "error", "message": "Segmentasi iris gagal"})
+
+    normalized = iris_processor.normalize_iris(img, pupil, iris)
+    template_bytes, mask_bytes = iris_processor.extract_features(normalized)
+
+    if not template_bytes:
+        return jsonify({"status": "error", "message": "Template iris gagal diproses"})
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT username, iris_template FROM iris_data")
+            for row in cursor.fetchall():
+                try:
+                    decrypted_template = decrypt_data(row['iris_template'])
+                    distance = iris_processor.calculate_distance(template_bytes, decrypted_template)
+                    if distance < 475:
+                        return jsonify({"status": "error", "message": f"Iris sudah terdaftar sebagai '{row['username']}'"})
+                except:
+                    continue
+
+            encrypted_template = encrypt_data(template_bytes)
+            encrypted_mask = encrypt_data(mask_bytes)
+
+            cursor.execute("INSERT INTO iris_data (username, iris_template, iris_mask) VALUES (%s, %s, %s)", (username, encrypted_template, encrypted_mask))
+            conn.commit()
+            log_audit("USER_REGISTERED", username=username, status="client_register")
+            return jsonify({"status": "success", "message": "Pendaftaran berhasil", "username": username})
 
 @app.route('/system_status')
 def system_status():
     status = {
-        "webcam": webcam.is_active(),
+        # "webcam": webcam.is_active(),
         "database": "OK",
         "model_loaded": model is not None,
         "last_scan": datetime.now().isoformat()
@@ -597,10 +645,10 @@ def system_status():
             
     return jsonify(status)
 
-@atexit.register
-def cleanup():
-    print("[INFO] Menutup webcam...")
-    webcam.stop()
+# @atexit.register
+# def cleanup():
+#     print("[INFO] Menutup webcam...")
+#     webcam.stop()
 
 if __name__ == '__main__':
     init_db()
