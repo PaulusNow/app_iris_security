@@ -475,49 +475,56 @@ def scan_client():
 
 @app.route('/do_register_client', methods=['POST'])
 def do_register_client():
-    data = request.json
-    username = data.get('username')
-    base64_image = data.get('image')
+    try:
+        data = request.json
+        username = data.get('username')
+        base64_image = data.get('image')
 
-    if not username or not base64_image:
-        return jsonify({"status": "error", "message": "Data tidak lengkap"})
+        if not username or not base64_image:
+            return jsonify({"status": "error", "message": "Data tidak lengkap"})
 
-    img = base64_to_cv2(base64_image)
-    if img is None:
-        return jsonify({"status": "error", "message": "Gambar tidak valid"})
+        img = base64_to_cv2(base64_image)
+        if img is None:
+            return jsonify({"status": "error", "message": "Gambar tidak valid"})
 
-    gray = iris_processor.preprocess_image(img)
-    pupil = iris_processor.detect_pupil(gray)
-    iris = iris_processor.detect_iris(gray, pupil)
-    if pupil is None or iris is None:
-        return jsonify({"status": "error", "message": "Segmentasi iris gagal"})
+        gray = iris_processor.preprocess_image(img)
+        pupil = iris_processor.detect_pupil(gray)
+        iris = iris_processor.detect_iris(gray, pupil)
+        if pupil is None or iris is None:
+            return jsonify({"status": "error", "message": "Segmentasi iris gagal"})
 
-    normalized = iris_processor.normalize_iris(img, pupil, iris)
-    template_bytes, mask_bytes = iris_processor.extract_features(normalized)
+        normalized = iris_processor.normalize_iris(img, pupil, iris)
+        template_bytes, mask_bytes = iris_processor.extract_features(normalized)
 
-    if not template_bytes:
-        return jsonify({"status": "error", "message": "Template iris gagal diproses"})
+        if not template_bytes:
+            return jsonify({"status": "error", "message": "Template iris gagal diproses"})
 
-    with get_db_connection() as conn:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT username, iris_template FROM iris_data")
-            for row in cursor.fetchall():
-                try:
-                    decrypted_template = decrypt_data(row['iris_template'])
-                    distance = iris_processor.calculate_distance(template_bytes, decrypted_template)
-                    if distance < 475:
-                        return jsonify({"status": "error", "message": f"Iris sudah terdaftar sebagai '{row['username']}'"})
-                except:
-                    continue
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT username, iris_template FROM iris_data")
+                for row in cursor.fetchall():
+                    try:
+                        decrypted_template = decrypt_data(row['iris_template'])
+                        distance = iris_processor.calculate_distance(template_bytes, decrypted_template)
+                        if distance < 475:
+                            return jsonify({"status": "error", "message": f"Iris sudah terdaftar sebagai '{row['username']}'"})
+                    except Exception as e:
+                        print(f"[WARNING] Gagal decrypt atau hitung jarak: {e}")
+                        continue
 
-            encrypted_template = encrypt_data(template_bytes)
-            encrypted_mask = encrypt_data(mask_bytes)
+                encrypted_template = encrypt_data(template_bytes)
+                encrypted_mask = encrypt_data(mask_bytes)
 
-            cursor.execute("INSERT INTO iris_data (username, iris_template, iris_mask) VALUES (%s, %s, %s)", (username, encrypted_template, encrypted_mask))
-            conn.commit()
-            log_audit("USER_REGISTERED", username=username, status="client_register")
-            return jsonify({"status": "success", "message": "Pendaftaran berhasil", "username": username})
-
+                cursor.execute("INSERT INTO iris_data (username, iris_template, iris_mask) VALUES (%s, %s, %s)", (username, encrypted_template, encrypted_mask))
+                conn.commit()
+                log_audit("USER_REGISTERED", username=username, status="client_register")
+                return jsonify({"status": "success", "message": "Pendaftaran berhasil", "username": username})
+    
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": f"Terjadi kesalahan server: {str(e)}"}), 500
+    
 @app.route('/system_status')
 def system_status():
     connection = None
