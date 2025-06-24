@@ -16,16 +16,11 @@ import requests
 import base64
 from io import BytesIO
 from PIL import Image
+import mysql.connector
 
 app = Flask(__name__)
 
 # ===== CONFIGURATION =====
-# MYSQL_HOST = os.environ.get('MYSQL_HOST', 'iris-security.criyqeisgk0r.ap-southeast-2.rds.amazonaws.com')
-# MYSQL_USER = os.environ.get('MYSQL_USER', 'admin')
-# MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'aws_iris_eye_no_eye')
-# MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
-# MYSQL_CHARSET = 'utf8mb4'
-
 MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
 MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
 MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '123456789')
@@ -46,41 +41,7 @@ except Exception as e:
     print(f"Error loading model: {e}")
     model = None
 
-# ===== WEBCAM MANAGER =====
-# class WebcamManager:
-#     def __init__(self):
-#         self.cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
-#         self.lock = threading.Lock()
-#         self.running = True
-#         self.latest_frame = None
-#         self.thread = threading.Thread(target=self.update_frames, daemon=True)
-#         self.thread.start()
-
-#     def update_frames(self):
-#         while self.running:
-#             with self.lock:
-#                 if self.cap.isOpened():
-#                     ret, frame = self.cap.read()
-#                     if ret:
-#                         self.latest_frame = frame
-#             time.sleep(0.03)
-
-#     def get_frame(self):
-#         with self.lock:
-#             return self.latest_frame.copy() if self.latest_frame is not None else None
-
-#     def stop(self):
-#         self.running = False
-#         self.thread.join()
-#         self.cap.release()
-
-#     def is_active(self):
-#         return self.cap.isOpened()
-
-# webcam = WebcamManager()
-
 # ===== IRIS PROCESSOR (IMPLEMENTING PAPER METHODS) =====
-# Tambahkan kembali fungsi calculate_distance ke dalam IrisProcessor
 class IrisProcessor:
     def preprocess_image(self, img):
         return cv2.cvtColor(cv2.resize(img, (776, 437)), cv2.COLOR_BGR2GRAY)
@@ -167,11 +128,11 @@ def predict_eye_noeye(img):
 
 def get_db_connection():
     return pymysql.connect(
-        host=MYSQL_HOST,
-        user=MYSQL_USER,
-        password=MYSQL_PASSWORD,
-        database=MYSQL_DB,
-        charset=MYSQL_CHARSET,
+        host=os.environ.get('MYSQL_HOST', 'localhost'),
+        user=os.environ.get('MYSQL_USER', 'root'),
+        password=os.environ.get('MYSQL_PASSWORD', '123456789'),
+        database=os.environ.get('MYSQL_DB', 'iris_security'),
+        charset='utf8mb4',
         cursorclass=pymysql.cursors.DictCursor
     )
 
@@ -237,77 +198,6 @@ def init_db():
 @app.route('/')
 def index():
     return render_template('index.html')
-
-# @app.route('/video_feed')
-# def video_feed():
-#     def generate():
-#         while True:
-#             frame = webcam.get_frame()
-#             if frame is None:
-#                 continue
-
-#             ret, jpeg = cv2.imencode('.jpg', frame)
-#             frame_bytes = jpeg.tobytes()
-#             yield (b'--frame\r\n'
-#                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n\r\n')
-#             time.sleep(0.03)
-#     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-# @app.route('/scan', methods=['POST'])
-# def scan():
-#     img = webcam.get_frame()
-#     if img is None:
-#         print("[ERROR] Tidak dapat mengambil gambar dari webcam.")
-#         return jsonify({"status": "error", "message": "Gagal mengambil gambar"})
-
-#     if predict_eye_noeye(img) != "eye":
-#         print("[INFO] Gambar bukan iris yang valid.")
-#         return jsonify({"status": "noeye", "message": "Iris tidak terdeteksi"})
-
-#     gray = iris_processor.preprocess_image(img)
-#     pupil = iris_processor.detect_pupil(gray)
-#     iris = iris_processor.detect_iris(gray, pupil)
-#     if pupil is None or iris is None:
-#         print("[ERROR] Segmentasi pupil atau iris gagal.")
-#         return jsonify({"status": "error", "message": "Segmentasi gagal"})
-
-#     normalized = iris_processor.normalize_iris(img, pupil, iris)
-#     template_bytes, _ = iris_processor.extract_features(normalized)
-
-#     if not template_bytes:
-#         print("[ERROR] Gagal mengekstrak fitur iris.")
-#         return jsonify({"status": "error", "message": "Gagal mengekstrak template iris"})
-
-#     with get_db_connection() as conn:
-#         with conn.cursor() as cursor:
-#             cursor.execute("SELECT username, iris_template FROM iris_data")
-#             best_match = None
-#             min_distance = float('inf')
-
-#             for row in cursor.fetchall():
-#                 try:
-#                     decrypted_template = decrypt_data(row['iris_template'])
-#                     distance = iris_processor.calculate_distance(template_bytes, decrypted_template)
-#                     print(f"[DEBUG] Distance to {row['username']}: {distance}")
-#                     if distance < min_distance:
-#                         min_distance = distance
-#                         best_match = row['username']
-#                 except Exception as e:
-#                     print(f"[ERROR] Gagal mendekripsi atau menghitung jarak untuk {row['username']}: {e}")
-#                     continue
-
-#             if min_distance < 475:
-#                 log_audit("SCAN_SUCCESS", username=best_match, status=f"distance={min_distance}")
-                
-#                 try:
-#                     response = requests.get(f"{ESP32_IP}/unlock", params={"user": best_match}, timeout=3)
-#                     print(f"[ESP32] Dikirim via WiFi: {response.text}")
-#                     return jsonify({"status": "match", "username": best_match, "message": f"Akses diberikan kepada {best_match}"})
-#                 except Exception as e:
-#                     print(f"[ESP32] Gagal kirim ke ESP32: {e}")
-#                     return jsonify({"status": "esp32_offline", "username": best_match, "message": "Verifikasi Sukses, namun Modul ESP32 sedang Offline"})
-
-#             return jsonify({"status": "no_match", "message": "User tidak dikenali"})
                 
 @app.route('/enroll', methods=['POST'])
 def enroll_user():
@@ -652,4 +542,15 @@ def system_status():
 
 if __name__ == '__main__':
     init_db()
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) AS total FROM audit_log")
+            result = cursor.fetchone()
+            print(f"Total baris di audit_log: {result['total']}")
+    except Exception as e:
+        print(f"Gagal koneksi ke database: {e}")
+    finally:
+        if conn:
+            conn.close()
     app.run(host='0.0.0.0', port=5000, debug=DEBUG_MODE)
