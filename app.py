@@ -165,6 +165,7 @@ def log_audit(event, username=None, status=None):
             connection.close()
 
 def init_db():
+    connection = None
     try:
         connection = get_db_connection()
         with connection.cursor() as cursor:
