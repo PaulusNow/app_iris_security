@@ -19,10 +19,19 @@ from PIL import Image
 
 app = Flask(__name__)
 
+esp32_commands = {}
+latest_esp32_ip = None
+
 # ===== CONFIGURATION =====
+# MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
+# MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
+# MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '123456789')
+# MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
+# MYSQL_CHARSET = 'utf8mb4'
+
 MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
-MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
-MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '123456789')
+MYSQL_USER = os.environ.get('MYSQL_USER', 'iris_app')
+MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'password_kuat123!')
 MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
 MYSQL_CHARSET = 'utf8mb4'
 
@@ -466,8 +475,9 @@ def scan_client():
             if min_distance < 475:
                 log_audit("SCAN_SUCCESS", username=best_match, status=f"distance={min_distance}")
                 try:
-                    response = requests.get(f"{ESP32_IP}/unlock", params={"user": best_match}, timeout=3)
-                    return jsonify({"status": "match", "username": best_match, "message": f"Akses diberikan kepada {best_match}"})
+                    esp32_commands["ESP123"] = "unlock"
+                    response = requests.get(f"{latest_esp32_ip}/unlock", params={"user": best_match}, timeout=3)
+                    return jsonify({"status": "match", "username": best_match, "message": f"Akses diberikan!"})
                 except:
                     return jsonify({"status": "esp32_offline", "username": best_match, "message": "Verifikasi Sukses, namun Modul ESP32 sedang Offline"})
 
@@ -546,10 +556,74 @@ def system_status():
             
     return jsonify(status)
 
+@app.route('/esp32/scan_wifi')
+def scan_wifi():
+    if not latest_esp32_ip:
+        return jsonify({"status": "error", "message": "ESP32 belum terkoneksi", "ssids": []})
+    try:
+        response = requests.get(f"{latest_esp32_ip}/wifi_scan", timeout=3)
+        return jsonify({"status": "success", "ssids": response.json().get('ssids', [])})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e), "ssids": []})
+
+@app.route('/esp32/set_wifi', methods=['POST'])
+def set_wifi():
+    if not latest_esp32_ip:
+        return jsonify({"status": "error", "message": "ESP32 belum terkoneksi"})
+    ssid = request.form.get('ssid')
+    password = request.form.get('password')
+    try:
+        requests.post(f"{latest_esp32_ip}/wifi_connect", json={"ssid": ssid, "password": password}, timeout=3)
+        return jsonify({"status": "success", "message": f"Koneksi dikirim ke ESP32"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Gagal kirim ke ESP32: {e}"})
+
+
+@app.route('/esp32/update_ip', methods=['POST'])
+def update_ip():
+    global latest_esp32_ip
+    data = request.json
+    esp_id = data.get('id')
+    ip = data.get('ip')
+    latest_esp32_ip = f"http://{ip}"
+    print(f"[ESP32] {esp_id} IP updated to {ip}")
+    return jsonify({"status": "received"})
+
+
+@app.route('/esp32/command')
+def get_command():
+    esp_id = request.args.get('id')
+    cmd = esp32_commands.pop(esp_id, "none")
+    return jsonify({"command": cmd})
+
+@app.route('/esp32/acknowledge', methods=['POST'])
+def esp_ack():
+    data = request.json
+    esp_id = data.get('id')
+    action = data.get('action')
+    print(f"[ESP32] {esp_id} confirmed: {action}")
+    return jsonify({"status": "acknowledged"})
+
+
 # @atexit.register
 # def cleanup():
 #     print("[INFO] Menutup webcam...")
 #     webcam.stop()
+
+# if __name__ == '__main__':
+#     init_db()
+#     try:
+#         conn = get_db_connection()
+#         with conn.cursor() as cursor:
+#             cursor.execute("SELECT COUNT(*) AS total FROM audit_log")
+#             result = cursor.fetchone()
+#             print(f"Total baris di audit_log: {result['total']}")
+#     except Exception as e:
+#         print(f"Gagal koneksi ke database: {e}")
+#     finally:
+#         if conn:
+#             conn.close()
+#     app.run(host='0.0.0.0', port=5000, debug=DEBUG_MODE)
 
 if __name__ == '__main__':
     init_db()
@@ -562,6 +636,6 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"Gagal koneksi ke database: {e}")
     finally:
-        if conn:
+        if 'conn' in locals() and conn:
             conn.close()
     app.run(host='0.0.0.0', port=5000, debug=DEBUG_MODE)
