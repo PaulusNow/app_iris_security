@@ -20,20 +20,20 @@ from PIL import Image
 app = Flask(__name__)
 
 esp32_commands = {}
-latest_esp32_ip = None
+latest_esp32_ip = "http://192.168.1.9/"
 
 # ===== CONFIGURATION =====
-# MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
-# MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
-# MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '123456789')
-# MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
-# MYSQL_CHARSET = 'utf8mb4'
-
 MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
-MYSQL_USER = os.environ.get('MYSQL_USER', 'iris_app')
-MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'password_kuat123!')
+MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
+MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '123456789')
 MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
 MYSQL_CHARSET = 'utf8mb4'
+
+# MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
+# MYSQL_USER = os.environ.get('MYSQL_USER', 'iris_app')
+# MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'password_kuat123!')
+# MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
+# MYSQL_CHARSET = 'utf8mb4'
 
 AES_KEY = os.environ.get('AES_KEY', 'my_super_secret_key_32bytes').ljust(32)[:32].encode()
 ESP32_IP = os.environ.get('ESP32_IP', 'http://192.168.104.160')
@@ -561,7 +561,7 @@ def scan_wifi():
     if not latest_esp32_ip:
         return jsonify({"status": "error", "message": "ESP32 belum terkoneksi", "ssids": []})
     try:
-        response = requests.get(f"{latest_esp32_ip}/wifi_scan", timeout=3)
+        response = requests.get(f"{latest_esp32_ip}/wifi_scan", timeout=10)
         return jsonify({"status": "success", "ssids": response.json().get('ssids', [])})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e), "ssids": []})
@@ -636,6 +636,6 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"Gagal koneksi ke database: {e}")
     finally:
-        if 'conn' in locals() and conn:
+        if conn:
             conn.close()
     app.run(host='0.0.0.0', port=5000, debug=DEBUG_MODE)
