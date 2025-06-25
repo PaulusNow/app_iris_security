@@ -564,8 +564,13 @@ def get_command():
     esp_id = request.args.get('id')
     if not esp_id:
         return jsonify({"command": "none"})
+    
     command = esp32_commands.get(esp_id, "none")
+    if command != "none":
+        esp32_commands[esp_id] = "none" 
+    
     return jsonify({"command": command})
+
 
 @app.route('/esp32/acknowledge', methods=['POST'])
 def esp_ack():
