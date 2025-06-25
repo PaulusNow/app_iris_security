@@ -36,7 +36,7 @@ MYSQL_CHARSET = 'utf8mb4'
 # MYSQL_CHARSET = 'utf8mb4'
 
 AES_KEY = os.environ.get('AES_KEY', 'my_super_secret_key_32bytes').ljust(32)[:32].encode()
-ESP32_IP = os.environ.get('ESP32_IP', 'http://192.168.104.160')
+ESP32_IP = os.environ.get('ESP32_IP', 'http://192.168.1.9')
 IRIS_MATCH_THRESHOLD = 475
 DEBUG_MODE = os.environ.get('DEBUG_MODE', 'False').lower() == 'true'
 MODEL_PATH = os.path.join('model', 'iris_model_alexnet.h5')
@@ -556,53 +556,53 @@ def system_status():
             
     return jsonify(status)
 
-@app.route('/esp32/scan_wifi')
-def scan_wifi():
-    if not latest_esp32_ip:
-        return jsonify({"status": "error", "message": "ESP32 belum terkoneksi", "ssids": []})
-    try:
-        response = requests.get(f"{latest_esp32_ip}/wifi_scan", timeout=10)
-        return jsonify({"status": "success", "ssids": response.json().get('ssids', [])})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e), "ssids": []})
+# @app.route('/esp32/scan_wifi')
+# def scan_wifi():
+#     if not latest_esp32_ip:
+#         return jsonify({"status": "error", "message": "ESP32 belum terkoneksi", "ssids": []})
+#     try:
+#         response = requests.get(f"{latest_esp32_ip}/wifi_scan", timeout=10)
+#         return jsonify({"status": "success", "ssids": response.json().get('ssids', [])})
+#     except Exception as e:
+#         return jsonify({"status": "error", "message": str(e), "ssids": []})
 
-@app.route('/esp32/set_wifi', methods=['POST'])
-def set_wifi():
-    if not latest_esp32_ip:
-        return jsonify({"status": "error", "message": "ESP32 belum terkoneksi"})
-    ssid = request.form.get('ssid')
-    password = request.form.get('password')
-    try:
-        requests.post(f"{latest_esp32_ip}/wifi_connect", json={"ssid": ssid, "password": password}, timeout=3)
-        return jsonify({"status": "success", "message": f"Koneksi dikirim ke ESP32"})
-    except Exception as e:
-        return jsonify({"status": "error", "message": f"Gagal kirim ke ESP32: {e}"})
-
-
-@app.route('/esp32/update_ip', methods=['POST'])
-def update_ip():
-    global latest_esp32_ip
-    data = request.json
-    esp_id = data.get('id')
-    ip = data.get('ip')
-    latest_esp32_ip = f"http://{ip}"
-    print(f"[ESP32] {esp_id} IP updated to {ip}")
-    return jsonify({"status": "received"})
+# @app.route('/esp32/set_wifi', methods=['POST'])
+# def set_wifi():
+#     if not latest_esp32_ip:
+#         return jsonify({"status": "error", "message": "ESP32 belum terkoneksi"})
+#     ssid = request.form.get('ssid')
+#     password = request.form.get('password')
+#     try:
+#         requests.post(f"{latest_esp32_ip}/wifi_connect", json={"ssid": ssid, "password": password}, timeout=3)
+#         return jsonify({"status": "success", "message": f"Koneksi dikirim ke ESP32"})
+#     except Exception as e:
+#         return jsonify({"status": "error", "message": f"Gagal kirim ke ESP32: {e}"})
 
 
-@app.route('/esp32/command')
-def get_command():
-    esp_id = request.args.get('id')
-    cmd = esp32_commands.pop(esp_id, "none")
-    return jsonify({"command": cmd})
+# @app.route('/esp32/update_ip', methods=['POST'])
+# def update_ip():
+#     global latest_esp32_ip
+#     data = request.json
+#     esp_id = data.get('id')
+#     ip = data.get('ip')
+#     latest_esp32_ip = f"http://{ip}"
+#     print(f"[ESP32] {esp_id} IP updated to {ip}")
+#     return jsonify({"status": "received"})
 
-@app.route('/esp32/acknowledge', methods=['POST'])
-def esp_ack():
-    data = request.json
-    esp_id = data.get('id')
-    action = data.get('action')
-    print(f"[ESP32] {esp_id} confirmed: {action}")
-    return jsonify({"status": "acknowledged"})
+
+# @app.route('/esp32/command')
+# def get_command():
+#     esp_id = request.args.get('id')
+#     cmd = esp32_commands.pop(esp_id, "none")
+#     return jsonify({"command": cmd})
+
+# @app.route('/esp32/acknowledge', methods=['POST'])
+# def esp_ack():
+#     data = request.json
+#     esp_id = data.get('id')
+#     action = data.get('action')
+#     print(f"[ESP32] {esp_id} confirmed: {action}")
+#     return jsonify({"status": "acknowledged"})
 
 
 # @atexit.register

@@ -95,11 +95,6 @@
             top: 15px;
             right: 100px;
         }
-        .wifi-link {
-            position: absolute;
-            top: 15px;
-            right: 195px;
-        }
     </style>
 </head>
 
@@ -137,9 +132,6 @@
         <a href="/register" class="btn btn-sm btn-outline-primary register-link">
             <i class="bi bi-person-plus"></i> Register
         </a>
-        <button class="btn btn-sm btn-outline-success wifi-link" data-bs-toggle="modal" data-bs-target="#wifiModal">
-            <i class="bi bi-wifi"></i> Atur WiFi
-        </button>
 
     </div>
 
@@ -153,28 +145,6 @@
             <div class="toast-body" id="toastMessage"></div>
         </div>
     </div>
-
-    <!-- Modal WiFi -->
-    <div class="modal fade" id="wifiModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Koneksi WiFi ESP32</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <label>SSID</label>
-                    <select id="ssidList" class="form-select mb-2"></select>
-                    <label>Password</label>
-                    <input type="password" id="wifiPassword" class="form-control" placeholder="Masukkan password">
-                </div>
-                <div class="modal-footer">
-                    <button id="kirimWifi" class="btn btn-primary">Kirim ke ESP32</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -264,27 +234,6 @@
                 error: function () {
                     showToast("Terjadi kesalahan pada server", false);
                 }
-            });
-        });
-
-        $('#wifiModal').on('show.bs.modal', () => {
-            $.get('/esp32/scan_wifi', res => {
-                $('#ssidList').empty();
-                res.ssids.forEach(ssid => {
-                    $('#ssidList').append(`<option>${ssid}</option>`);
-                });
-            console.log("SSID response:", res);
-            });
-        });
-
-        $('#kirimWifi').click(() => {
-            const ssid = $('#ssidList').val();
-            const password = $('#wifiPassword').val();
-            $.post('/esp32/set_wifi', { ssid, password }, res => {
-                showToast(res.message, res.status === 'success');
-                $('#wifiModal').modal('hide');
-            }).fail(() => {
-                showToast('Gagal kirim WiFi ke ESP32', false);
             });
         });
 
