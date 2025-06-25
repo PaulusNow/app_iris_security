@@ -555,6 +555,32 @@ def system_status():
             connection.close()
             
     return jsonify(status)
+# Tambahkan ke bagian bawah app.py Flask kamu
+
+esp32_commands = {"ESP123": "none"}  # Bisa dibuat dinamis nanti
+
+@app.route('/esp32/command')
+def get_command():
+    esp_id = request.args.get('id')
+    if not esp_id:
+        return jsonify({"command": "none"})
+    command = esp32_commands.get(esp_id, "none")
+    return jsonify({"command": command})
+
+@app.route('/esp32/acknowledge', methods=['POST'])
+def esp_ack():
+    data = request.json
+    esp_id = data.get('id')
+    action = data.get('action')
+    print(f"[ESP32] {esp_id} confirmed: {action}")
+    # Reset command agar tidak dieksekusi ulang
+    esp32_commands[esp_id] = "none"
+    return jsonify({"status": "acknowledged"})
+
+@app.route('/send_unlock/<esp_id>')
+def send_unlock(esp_id):
+    esp32_commands[esp_id] = "unlock"
+    return jsonify({"status": "command_sent", "id": esp_id})
 
 # @app.route('/esp32/scan_wifi')
 # def scan_wifi():
