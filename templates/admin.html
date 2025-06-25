@@ -50,7 +50,7 @@
                         <table class="table table-striped">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
+                                    <th>No</th>
                                     <th>Username</th>
                                     <th>Tanggal Daftar</th>
                                     <th>Aksi</th>
@@ -124,10 +124,10 @@
                 $.get('/admin/users', function(response) {
                     if (response.users && response.users.length > 0) {
                         let rows = '';
-                        response.users.forEach(user => {
+                        response.users.forEach((user, index)=> {
                             rows += `
                                 <tr>
-                                    <td>${user.id}</td>
+                                    <td>${index + 1}</td>
                                     <td>${user.username}</td>
                                     <td>${new Date(user.created_at).toLocaleString()}</td>
                                     <td>
