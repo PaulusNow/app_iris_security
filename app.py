@@ -474,12 +474,9 @@ def scan_client():
 
             if min_distance < 475:
                 log_audit("SCAN_SUCCESS", username=best_match, status=f"distance={min_distance}")
-                try:
-                    esp32_commands["ESP123"] = "unlock"
-                    response = requests.get(f"{latest_esp32_ip}/unlock", params={"user": best_match}, timeout=3)
-                    return jsonify({"status": "match", "username": best_match, "message": f"Akses diberikan!"})
-                except:
-                    return jsonify({"status": "esp32_offline", "username": best_match, "message": "Verifikasi Sukses, namun Modul ESP32 sedang Offline"})
+                esp32_commands["ESP123"] = "unlock"
+                return jsonify({"status": "match", "username": best_match, "message": f"Akses diberikan ke {best_match}!"})
+
 
     return jsonify({"status": "no_match", "message": "User tidak dikenali"})
 
@@ -555,7 +552,6 @@ def system_status():
             connection.close()
             
     return jsonify(status)
-# Tambahkan ke bagian bawah app.py Flask kamu
 
 esp32_commands = {"ESP123": "none"}  # Bisa dibuat dinamis nanti
 
