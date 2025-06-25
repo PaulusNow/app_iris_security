@@ -16,11 +16,9 @@ import requests
 import base64
 from io import BytesIO
 from PIL import Image
-from datetime import datetime, timedelta, timezone
-from threading import Lock
-esp32_lock = Lock()
 
 
+os.environ['MYSQL_USER'] = 'root'
 
 app = Flask(__name__)
 
@@ -478,40 +476,13 @@ def scan_client():
                     continue
 
             if min_distance < 475:
+                log_audit("SCAN_SUCCESS", username=best_match, status=f"distance={min_distance}")
                 esp32_commands["ESP123"] = "unlock"
-                # Cek apakah ESP32 aktif (heartbeat dalam 30 detik terakhir)
-                last = last_ping.get("ESP123")
-                if not last or datetime.now(timezone.utc) - last > timedelta(seconds=30):
-                    log_audit("SCAN_MATCH_BUT_ESP32_OFFLINE", username=best_match, status="ESP32 ping timeout")
-                    return jsonify({
-                        "status": "esp32_offline",
-                        "username": best_match,
-                        "message": "Verifikasi berhasil, namun ESP32 tidak merespons (mungkin offline)"
-                    })
-
-                log_audit("SCAN_SUCCESS", username=best_match, status="unlock command sent")
-                return jsonify({
-                    "status": "match",
-                    "username": best_match,
-                    "message": f"Akses diberikan ke {best_match}!"
-                })
-
+                return jsonify({"status": "match", "username": best_match, "message": f"Akses diberikan !"})
 
 
     return jsonify({"status": "no_match", "message": "User tidak dikenali"})
 
-last_ping = {}
-
-@app.route('/esp32/ping', methods=['POST'])
-def esp32_ping():
-    data = request.json
-    esp_id = data.get('id')
-    if not esp_id:
-        return jsonify({"status": "error", "message": "ID wajib dikirim"}), 400
-
-    last_ping[esp_id] = datetime.now(timezone.utc)
-    print(f"[PING] ESP32 {esp_id} aktif pada {last_ping[esp_id].isoformat()}")
-    return jsonify({"status": "ok"})
 
 @app.route('/do_register_client', methods=['POST'])
 def do_register_client():
@@ -591,16 +562,10 @@ esp32_commands = {"ESP123": "none"}  # Bisa dibuat dinamis nanti
 @app.route('/esp32/command')
 def get_command():
     esp_id = request.args.get('id')
-    now = datetime.now(timezone.utc)
-    last = last_ping.get(esp_id)
-
-    if not last or now - last > timedelta(seconds=30):
-        print(f"[OFFLINE] ESP32 {esp_id} tidak aktif dalam 30 detik terakhir")
-        return jsonify({"command": "none", "message": "ESP32 offline"})
-
-    command = esp32_commands.pop(esp_id, "none")
+    if not esp_id:
+        return jsonify({"command": "none"})
+    command = esp32_commands.get(esp_id, "none")
     return jsonify({"command": command})
-
 
 @app.route('/esp32/acknowledge', methods=['POST'])
 def esp_ack():
