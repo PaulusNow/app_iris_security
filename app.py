@@ -27,7 +27,7 @@ MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
 MYSQL_CHARSET = 'utf8mb4'
 
 AES_KEY = os.environ.get('AES_KEY', 'my_super_secret_key_32bytes').ljust(32)[:32].encode()
-ESP32_IP = os.environ.get('ESP32_IP', 'http://10.10.10.190')
+ESP32_IP = os.environ.get('ESP32_IP', 'http://192.168.104.160')
 IRIS_MATCH_THRESHOLD = 475
 DEBUG_MODE = os.environ.get('DEBUG_MODE', 'False').lower() == 'true'
 MODEL_PATH = os.path.join('model', 'iris_model_alexnet.h5')
