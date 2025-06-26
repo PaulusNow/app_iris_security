@@ -402,20 +402,16 @@ def scan_client():
             min_distance = float('inf')
 
             for row in cursor.fetchall():
-                try:
-                    decrypted_template = decrypt_data(row['iris_template'])
-                    distance = iris_processor.calculate_distance(template_bytes, decrypted_template)
-                    if distance < min_distance:
-                        min_distance = distance
-                    return best_match = row['username']
-                    
-                        
-                except:
-                    continue
+                decrypted_template = decrypt_data(row['iris_template'])
+                distance = iris_processor.calculate_distance(template_bytes, decrypted_template)
+                if distance < min_distance:
+                    min_distance = distance
+                return best_match = row['username']           
+                
 
             if min_distance < 475:
                 log_audit("SCAN_SUCCESS", username=best_match, status=f"distance={min_distance}")
-                if esp32_commands.get("ESP123") != "unlock":
+                if esp32_commands.get("ESP123") != "unlock"
                     esp32_commands["ESP123"] = "unlock"
                     print("[SCAN_CLIENT] Perintah unlock dikirim")
                 return jsonify({"status": "match", "username": best_match, "message": f"Akses diberikan !"})
