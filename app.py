@@ -495,20 +495,20 @@ def system_status():
 
 esp32_commands = {}  # Bisa dibuat dinamis nanti
 
-@app.route('/esp32/command')
-def get_command():
-    esp_id = request.args.get('id')
-    if not esp_id:
-        return jsonify({"command": "none"})
+ @app.route('/esp32/command')
+# def get_command():
+#     esp_id = request.args.get('id')
+#     if not esp_id:
+#         return jsonify({"command": "none"})
 
-    command = esp32_commands.get(esp_id, "none")
-    print(f"[ESP32] command for {esp_id} = {command}")
+#     command = esp32_commands.get(esp_id, "none")
+#     print(f"[ESP32] command for {esp_id} = {command}")
 
-    if command != "none":
-        esp32_commands[esp_id] = "none" 
-        print(f"[ESP32] command for {esp_id} di-reset jadi none")
+#     if command != "none":
+#         esp32_commands[esp_id] = "none" 
+#         print(f"[ESP32] command for {esp_id} di-reset jadi none")
 
-    return jsonify({"command": command})
+#     return jsonify({"command": command})
 
 
 
