@@ -406,7 +406,7 @@ def scan_client():
                 distance = iris_processor.calculate_distance(template_bytes, decrypted_template)
                 if distance < min_distance:
                     min_distance = distance
-                return best_match = row['username']           
+                    best_match = row['username']           
                 
 
             if min_distance < 475:
@@ -501,17 +501,22 @@ def get_command():
     if not esp_id:
         return jsonify({"command": "none"})
 
+    command = esp32_commands.get(esp_id, "none")
+    print(f"[ESP32] command for {esp_id} = {command}")
+
     if command != "none":
         esp32_commands[esp_id] = "none" 
-    
+        print(f"[ESP32] command for {esp_id} di-reset jadi none")
+
     return jsonify({"command": command})
+
 
 
 @app.route('/esp32/acknowledge', methods=['POST'])
 def esp_ack():
     data = request.json
     esp_id = data.get('id')
-    action = data.get('action')
+    action = data.get('action')a
     print(f"[ESP32] {esp_id} confirmed: {action}")
     # Reset command agar tidak dieksekusi ulang
     esp32_commands[esp_id] = "none"
