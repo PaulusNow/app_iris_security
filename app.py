@@ -496,7 +496,7 @@ def system_status():
 
 esp32_commands = {}  # Bisa dibuat dinamis nanti
 
-@app.route('/esp32/command')
+@app.route('/esp32/command?id=ESP123')
 def get_command():
     esp_id = request.args.get('id')
     if not esp_id:
