@@ -22,7 +22,7 @@ os.environ['MYSQL_USER'] = 'root'
 
 app = Flask(__name__)
 
-esp32_commands = {}
+# esp32_commands = {}
 latest_esp32_ip = "http://192.168.1.9/"
 
 # ===== CONFIGURATION =====
@@ -362,70 +362,6 @@ def delete_user(user_id):
 def register_page():
     return render_template('register.html')
 
-# @app.route('/do_register', methods=['POST'])
-# def do_register():
-#     username = request.form.get('username')
-#     if not username:
-#         return jsonify({"status": "error", "message": "Username wajib diisi"})
-
-#     img = webcam.get_frame()
-#     if img is None:
-#         return jsonify({"status": "error", "message": "Gagal mengambil gambar"})
-
-#     gray = iris_processor.preprocess_image(img)
-#     pupil = iris_processor.detect_pupil(gray)
-#     iris = iris_processor.detect_iris(gray, pupil)
-#     if pupil is None or iris is None:
-#         return jsonify({"status": "error", "message": "Segmentasi iris gagal, mohon ulangi."})
-
-#     if iris[2] - pupil[2] < 5:
-#         print(f"[DEBUG] Pupil: {pupil}, Iris: {iris}")
-#         return jsonify({"status": "error", "message": "Jarak pupil dan iris terlalu kecil"})
-
-#     normalized = iris_processor.normalize_iris(img, pupil, iris)
-#     template_bytes, mask_bytes = iris_processor.extract_features(normalized)
-
-#     if not template_bytes:
-#         return jsonify({"status": "error", "message": "Template iris gagal diproses"})
-
-#     # Validasi stabilitas template
-#     self_distance = iris_processor.calculate_distance(template_bytes, template_bytes)
-#     print(f"[DEBUG] Self distance: {self_distance}")
-#     if self_distance > 20:
-#         return jsonify({"status": "error", "message": "Scan tidak stabil, harap ulangi."})
-
-#     encrypted_template = encrypt_data(template_bytes)
-#     encrypted_mask = encrypt_data(mask_bytes)
-
-#     with get_db_connection() as conn:
-#         with conn.cursor() as cursor:
-#             # Cek username duplikat
-#             cursor.execute("SELECT username FROM iris_data WHERE username = %s", (username,))
-#             if cursor.fetchone():
-#                 return jsonify({"status": "error", "message": f"Username '{username}' sudah terdaftar"})
-
-#             # Cek kemiripan iris
-#             cursor.execute("SELECT username, iris_template FROM iris_data")
-#             for row in cursor.fetchall():
-#                 try:
-#                     decrypted_template = decrypt_data(row['iris_template'])
-#                     distance = iris_processor.calculate_distance(template_bytes, decrypted_template)
-#                     print(f"[DEBUG] Distance to {row['username']}: {distance}")
-
-#                     if distance < 475:
-#                         log_audit("REGISTER_FAIL_DUPLICATE", username=username, status=f"Mirip {row['username']} distance={distance}")
-#                         return jsonify({"status": "error", "message": f"Iris sudah terdaftar sebagai '{row['username']}'"})
-#                     elif distance < 650:
-#                         log_audit("REGISTER_SUSPICIOUS_DUPLICATE", username=username, status=f"Terlalu mirip {row['username']} distance={distance}")
-#                         return jsonify({"status": "error", "message": f"Iris terlalu mirip dengan '{row['username']}', mohon pastikan ini pengguna berbeda."})
-#                 except Exception as e:
-#                     continue
-
-#             cursor.execute("INSERT INTO iris_data (username, iris_template, iris_mask) VALUES (%s, %s, %s)", (username, encrypted_template, encrypted_mask))
-#             conn.commit()
-#             log_audit("USER_REGISTERED", username=username, status="success")
-#             return jsonify({"status": "success", "message": "Pendaftaran berhasil", "username": username})
-        
 def base64_to_cv2(base64_data):
     try:
         header, encoded = base64_data.split(',', 1)
@@ -557,15 +493,14 @@ def system_status():
             
     return jsonify(status)
 
-esp32_commands = {"ESP123": "none"}  # Bisa dibuat dinamis nanti
+esp32_commands = {}  # Bisa dibuat dinamis nanti
 
 @app.route('/esp32/command')
 def get_command():
     esp_id = request.args.get('id')
     if not esp_id:
         return jsonify({"command": "none"})
-    
-    command = esp32_commands.get(esp_id, "none")
+
     if command != "none":
         esp32_commands[esp_id] = "none" 
     
@@ -581,80 +516,6 @@ def esp_ack():
     # Reset command agar tidak dieksekusi ulang
     esp32_commands[esp_id] = "none"
     return jsonify({"status": "acknowledged"})
-
-# @app.route('/send_unlock/<esp_id>')
-# def send_unlock(esp_id):
-#     esp32_commands[esp_id] = "unlock"
-#     return jsonify({"status": "command_sent", "id": esp_id})
-
-# @app.route('/esp32/scan_wifi')
-# def scan_wifi():
-#     if not latest_esp32_ip:
-#         return jsonify({"status": "error", "message": "ESP32 belum terkoneksi", "ssids": []})
-#     try:
-#         response = requests.get(f"{latest_esp32_ip}/wifi_scan", timeout=10)
-#         return jsonify({"status": "success", "ssids": response.json().get('ssids', [])})
-#     except Exception as e:
-#         return jsonify({"status": "error", "message": str(e), "ssids": []})
-
-# @app.route('/esp32/set_wifi', methods=['POST'])
-# def set_wifi():
-#     if not latest_esp32_ip:
-#         return jsonify({"status": "error", "message": "ESP32 belum terkoneksi"})
-#     ssid = request.form.get('ssid')
-#     password = request.form.get('password')
-#     try:
-#         requests.post(f"{latest_esp32_ip}/wifi_connect", json={"ssid": ssid, "password": password}, timeout=3)
-#         return jsonify({"status": "success", "message": f"Koneksi dikirim ke ESP32"})
-#     except Exception as e:
-#         return jsonify({"status": "error", "message": f"Gagal kirim ke ESP32: {e}"})
-
-
-# @app.route('/esp32/update_ip', methods=['POST'])
-# def update_ip():
-#     global latest_esp32_ip
-#     data = request.json
-#     esp_id = data.get('id')
-#     ip = data.get('ip')
-#     latest_esp32_ip = f"http://{ip}"
-#     print(f"[ESP32] {esp_id} IP updated to {ip}")
-#     return jsonify({"status": "received"})
-
-
-# @app.route('/esp32/command')
-# def get_command():
-#     esp_id = request.args.get('id')
-#     cmd = esp32_commands.pop(esp_id, "none")
-#     return jsonify({"command": cmd})
-
-# @app.route('/esp32/acknowledge', methods=['POST'])
-# def esp_ack():
-#     data = request.json
-#     esp_id = data.get('id')
-#     action = data.get('action')
-#     print(f"[ESP32] {esp_id} confirmed: {action}")
-#     return jsonify({"status": "acknowledged"})
-
-
-# @atexit.register
-# def cleanup():
-#     print("[INFO] Menutup webcam...")
-#     webcam.stop()
-
-# if __name__ == '__main__':
-#     init_db()
-#     try:
-#         conn = get_db_connection()
-#         with conn.cursor() as cursor:
-#             cursor.execute("SELECT COUNT(*) AS total FROM audit_log")
-#             result = cursor.fetchone()
-#             print(f"Total baris di audit_log: {result['total']}")
-#     except Exception as e:
-#         print(f"Gagal koneksi ke database: {e}")
-#     finally:
-#         if conn:
-#             conn.close()
-#     app.run(host='0.0.0.0', port=5000, debug=DEBUG_MODE)
 
 if __name__ == '__main__':
     init_db()
