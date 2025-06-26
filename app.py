@@ -582,10 +582,10 @@ def esp_ack():
     esp32_commands[esp_id] = "none"
     return jsonify({"status": "acknowledged"})
 
-@app.route('/send_unlock/<esp_id>')
-def send_unlock(esp_id):
-    esp32_commands[esp_id] = "unlock"
-    return jsonify({"status": "command_sent", "id": esp_id})
+# @app.route('/send_unlock/<esp_id>')
+# def send_unlock(esp_id):
+#     esp32_commands[esp_id] = "unlock"
+#     return jsonify({"status": "command_sent", "id": esp_id})
 
 # @app.route('/esp32/scan_wifi')
 # def scan_wifi():
