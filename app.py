@@ -1,3 +1,42 @@
+import os
+import cv2
+import numpy as np
+from datetime import datetime
+from flask import Flask, render_template, request, jsonify, Response
+from Crypto.Cipher import AES
+import pymysql
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing import image
+import threading
+import time
+import atexit
+import math
+import requests
+import base64
+from io import BytesIO
+from PIL import Image
+
+
+os.environ['MYSQL_USER'] = 'root'
+
+app = Flask(__name__)
+
+# esp32_commands = {}
+latest_esp32_ip = "http://192.168.1.9/"
+
+# ===== CONFIGURATION =====
+MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
+MYSQL_USER = os.environ.get('MYSQL_USER', 'root')
+MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '123456789')
+MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
+MYSQL_CHARSET = 'utf8mb4'
+
+# MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
+# MYSQL_USER = os.environ.get('MYSQL_USER', 'iris_app')
+# MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', 'password_kuat123!')
+# MYSQL_DB = os.environ.get('MYSQL_DB', 'iris_security')
+# MYSQL_CHARSET = 'utf8mb4'
 
 AES_KEY = os.environ.get('AES_KEY', 'my_super_secret_key_32bytes').ljust(32)[:32].encode()
 ESP32_IP = os.environ.get('ESP32_IP', 'http://192.168.1.9')
