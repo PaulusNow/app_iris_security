@@ -415,7 +415,7 @@ def scan_client():
                     esp32_commands["ESP123"] = "unlock"
                     esp32_commands[""] = "unlock"
                     print("[SCAN_CLIENT] Perintah unlock dikirim")
-                return jsonify({"status": "match", "username": best_match, "message": f"Akses diberikan !"})
+                return esp32_commands["ESP123"] = "none" jsonify({"status": "match", "username": best_match, "message": f"Akses diberikan !"})
 
 
     return jsonify({"status": "no_match", "message": "User tidak dikenali"})
