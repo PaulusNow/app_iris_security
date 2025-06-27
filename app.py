@@ -518,7 +518,7 @@ def get_command():
 def esp_ack():
     data = request.json
     esp_id = data.get('id')
-    action = data.get('action')a
+    action = data.get('action')
     print(f"[ESP32] {esp_id} confirmed: {action}")
     # Reset command agar tidak dieksekusi ulang
     esp32_commands[esp_id] = "none"
