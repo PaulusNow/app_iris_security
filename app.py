@@ -472,12 +472,14 @@ def scan_client():
                     if distance < min_distance:
                         min_distance = distance
                         best_match = row['username']
+                        
                 except:
                     continue
 
             if min_distance < 475:
                 log_audit("SCAN_SUCCESS", username=best_match, status=f"distance={min_distance}")
                 esp32_commands["ESP123"] = "unlock"
+                print(f"[UNLOCK TRIGGERED] oleh {best_match} dengan jarak {min_distance}")
                 return jsonify({"status": "match", "username": best_match, "message": f"Akses diberikan !"})
 
 
